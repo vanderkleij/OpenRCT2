@@ -1598,7 +1598,7 @@ void format_string_part(char **dest, rct_string_id format, char **args)
 		format -= 0x8000;
 		// args += (format & 0xC00) >> 9;
 		format &= ~0xC00;
-		strcpy(*dest, RCT2_ADDRESS(0x135A8F4 + (format * 32), char));
+		strcpy(*dest, RCT2_ADDRESS(RCT2_ADDRESS_CUSTOM_STRINGS + (format * 32), char));
 		*dest = strchr(*dest, 0) + 1;
 	} else if (format < 0xE000) {
 		// Real name
@@ -1689,6 +1689,22 @@ void generate_string_file()
 */
 void reset_saved_strings() {
 	for (int i = 0; i < 1024; i++) {
-		RCT2_ADDRESS(0x135A8F4, uint8)[i * 32] = 0;
+		RCT2_ADDRESS(RCT2_ADDRESS_CUSTOM_STRINGS, uint8)[i * 32] = 0;
 	}
+}
+
+/*
+*
+* rct2: 0x006C42AC
+*/
+void string_ids_reset_custom_string(rct_string_id id)
+{
+	if (id < 0x8000)
+		return;
+
+	if (id >= 0x9000)
+		return;
+
+	int eax = (id & 0x3FF) * 32;
+	RCT2_ADDRESS(RCT2_ADDRESS_CUSTOM_STRINGS, uint8)[eax] = 0;
 }

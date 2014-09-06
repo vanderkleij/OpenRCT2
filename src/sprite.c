@@ -18,9 +18,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *****************************************************************************/
 
-#include "addresses.h"
 #include <string.h>
+
+#include "addresses.h"
 #include "sprite.h"
+#include "string_ids.h"
 
 rct_sprite* g_sprite_list = RCT2_ADDRESS(RCT2_ADDRESS_SPRITE_LIST, rct_sprite);
 
@@ -130,7 +132,8 @@ rct_sprite *create_sprite(uint8 bl)
 		return NULL;
 	}
 
-	rct_unk_sprite *sprite = &(g_sprite_list[RCT2_GLOBAL(RCT2_ADDRESS_SPRITES_NEXT_INDEX, uint16)]).unknown;
+	uint16 nextIndex = RCT2_GLOBAL(RCT2_ADDRESS_SPRITES_NEXT_INDEX, uint16);
+	rct_unk_sprite *sprite = &(g_sprite_list[nextIndex]).unknown;
 
 	move_sprite_to_list((rct_sprite *)sprite, (uint8)linkedListTypeOffset);
 
@@ -169,6 +172,7 @@ void move_sprite_to_list(rct_sprite *sprite, uint8 cl)
 	// sprite following this one becomes the new head of the list.
 	if (unkSprite->previous == SPRITE_INDEX_NULL)
 	{
+		// linked_list_type_offset can be 0, in which case we set RCT2_ADDRESS_SPRITES_NEXT_INDEX here
 		RCT2_GLOBAL(RCT2_ADDRESS_SPRITES_NEXT_INDEX + unkSprite->linked_list_type_offset, uint16) = unkSprite->next;
 	}
 	else
@@ -200,4 +204,48 @@ void move_sprite_to_list(rct_sprite *sprite, uint8 cl)
 	// Decrement old list counter, increment new list counter.
 	--(RCT2_GLOBAL(0x13573C8 + oldListTypeOffset, uint16));
 	++(RCT2_GLOBAL(0x13573C8 + cl, uint16));
+}
+
+/*
+*
+* rct2: 0x0069EDB6
+* sprite: a sprite to reset/remove (esi)
+*/
+void sprite_reset(rct_sprite *sprite)
+{
+	move_sprite_to_list(sprite, 0);
+
+	string_ids_reset_custom_string(sprite->unknown.name_string_idx);
+
+	sprite->unknown.sprite_identifier = 0xFF;
+
+	// &RCT2_ADDRESS(0xF1EF60, uint16)[0x10000] = 0xf3ef60.
+	// 0xf3ef60 contains the sprite index of the last created
+	// sprite (cf. create_sprite() in sprite.c).
+	int edi = 0x10000;
+
+	if ((uint16)sprite->unknown.x != SPRITE_LOCATION_NULL)
+	{
+		// Pack the x and y values into edi.
+		edi = (uint16)sprite->unknown.x & 0x1FE0; // 1111111100000
+		edi = (edi << 3) | (((uint16)sprite->unknown.y) >> 5);
+	}
+
+	// It looks like 0xF1EF60 is some kind of hash index
+	// that contains the ids of the heads of linked lists of
+	// sprites at/near the same location.
+	// We use the packed values of x and y in EDI to look
+	// up an initial id in this hash index.
+	uint16 *spriteIndex = &RCT2_ADDRESS(0xF1EF60, uint16)[edi];
+
+	// We then walk the linked list starting from the id that we found
+	// in the hash index, until we found the specified sprite
+	while (&g_sprite_list[*spriteIndex] != sprite)
+	{
+		spriteIndex = &g_sprite_list[*spriteIndex].unknown.var_02;
+	}
+
+	// spriteIndex now points to var_02 of the sprite BEFORE the specified sprite.
+	// We set that to this sprite's next value, unlinking this sprite from the list.
+	*spriteIndex = sprite->unknown.var_02;
 }

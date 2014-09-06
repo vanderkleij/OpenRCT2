@@ -27,6 +27,7 @@ void format_string(char *dest, rct_string_id format, void *args);
 void generate_string_file();
 void reset_saved_strings();
 void error_string_quit(int error, rct_string_id format);
+void string_ids_reset_custom_string(rct_string_id id);
 
 char format_get_code(const char *token);
 const char *format_get_token(char code);
